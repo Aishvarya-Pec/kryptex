@@ -1,6 +1,6 @@
 "use client";
 import { Canvas, useFrame } from '@react-three/fiber';
-import { OrbitControls, useGLTF } from '@react-three/drei';
+import { OrbitControls, useGLTF, Text } from '@react-three/drei';
 import * as THREE from 'three';
 import React, { Suspense, useMemo, useRef } from 'react';
 import { ParticleBackground } from './blocks/ParticleBackground';
@@ -24,13 +24,14 @@ export type SceneJSON = {
   objects: SceneObject[];
 };
 
-function Model({ url, ...props }: { url: string } & React.ComponentProps<'group'>) {
-  const resolvedUrl = resolveAsset(url);
+function Model({ url, assetEntries = [], ...props }: { url: string; assetEntries?: { name: string; url: string }[] } & React.ComponentProps<'group'>) {
+  const assetMap = useMemo(() => new Map(assetEntries.map(a => [a.name, a.url])), [assetEntries]);
+  const resolvedUrl = resolveAsset(url, assetMap);
   const { scene } = useGLTF(resolvedUrl);
   return <primitive object={scene} {...props} />;
 }
 
-const RenderedObject = ({ obj }: { obj: SceneObject }) => {
+const RenderedObject = ({ obj, assets = [] }: { obj: SceneObject; assets?: { name: string; url: string }[] }) => {
   const ref = useRef<THREE.Group>(null!);
 
   // Animation handler
@@ -104,24 +105,28 @@ const RenderedObject = ({ obj }: { obj: SceneObject }) => {
         </mesh>
       )}
       {obj.type === 'text' && (
-        <mesh>
-          <boxGeometry args={[(obj.props?.text?.length ?? 5) * 0.2, 0.5, 0.1]} />
-          <meshBasicMaterial color={color} />
-        </mesh>
+        <Text
+          fontSize={obj.props?.fontSize ?? 0.5}
+          color={color}
+          anchorX="center"
+          anchorY="middle"
+        >
+          {obj.props?.text ?? '...'}
+        </Text>
       )}
-      {obj.type === 'model' && obj.props?.src && <Model url={obj.props.src} />}
+      {obj.type === 'model' && obj.props?.src && <Model url={obj.props.src} assetEntries={assets} />}
     </group>
   );
 };
 
-export default function ScenePlayer({ scene }: { scene: SceneJSON }) {
+export default function ScenePlayer({ scene, assets }: { scene: SceneJSON; assets?: { name: string; url: string }[] }) {
   const cam = useMemo(() => scene.camera ?? { type: 'orbit', position: { x: 0, y: 1.4, z: 6 }, fov: 50 }, [scene]);
   return (
     <Canvas camera={{ position: [cam.position?.x ?? 0, cam.position?.y ?? 1.4, cam.position?.z ?? 6], fov: cam.fov ?? 50 }}>
       <ambientLight intensity={0.6} />
       <pointLight position={[2, 3, 2]} />
       <Suspense fallback={null}>
-        {scene.objects?.map((obj) => <RenderedObject key={obj.id} obj={obj} />)}
+        {scene.objects?.map((obj) => <RenderedObject key={obj.id} obj={obj} assets={assets} />)}
       </Suspense>
       {cam.type === 'orbit' && <OrbitControls enablePan enableZoom />}
     </Canvas>

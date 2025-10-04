@@ -80,6 +80,7 @@ export default function ChatStudioPage(): JSX.Element {
   const [scene, setScene] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
+  const [uploadedAssets, setUploadedAssets] = useState<{ name: string; url: string }[]>([]);
   
 
   useEffect(() => {
@@ -202,6 +203,30 @@ export default function ChatStudioPage(): JSX.Element {
     }
   };
 
+  const handleAssetUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('/api/assets/upload', {
+        method: 'POST',
+        body: formData,
+      });
+      const data = await res.json();
+      if (data.success) {
+        setUploadedAssets(prev => [...prev, { name: file.name, url: data.url }]);
+        setMessages(m => [...m, { role: 'assistant', content: `Asset "${file.name}" uploaded.` }]);
+      } else {
+        throw new Error('Upload failed');
+      }
+    } catch (err: any) {
+      setMessages(m => [...m, { role: 'assistant', content: `Asset upload error: ${String(err?.message ?? err)}` }]);
+    }
+  };
+
   return (
     <main className="p-4 space-y-4">
       <header className="flex items-center justify-between">
@@ -260,12 +285,21 @@ export default function ChatStudioPage(): JSX.Element {
               {loading ? "Refining…" : "Refine"}
             </button>
           </div>
+          <div className="rounded border border-white/10 p-3">
+            <h3 className="font-semibold mb-2">Assets</h3>
+            <input type="file" onChange={handleAssetUpload} className="text-sm" />
+            <ul className="mt-2 text-xs space-y-1">
+              {uploadedAssets.map(asset => (
+                <li key={asset.url}><strong>{asset.name}</strong>: <code>{asset.url}</code></li>
+              ))}
+            </ul>
+          </div>
         </div>
 
         <div className="lg:col-span-2">
           <div className="h-[70vh] rounded overflow-hidden border border-white/10">
             {scene ? (
-              <ScenePlayer scene={scene} />
+              <ScenePlayer scene={scene} assets={uploadedAssets} />
             ) : (
               <div className="w-full h-full grid place-items-center text-slate-400">No scene yet — generate to preview.</div>
             )}
