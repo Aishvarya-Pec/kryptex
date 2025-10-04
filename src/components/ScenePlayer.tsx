@@ -3,6 +3,8 @@ import { Canvas, useFrame } from '@react-three/fiber';
 import { OrbitControls, useGLTF } from '@react-three/drei';
 import * as THREE from 'three';
 import React, { Suspense, useMemo, useRef } from 'react';
+import { ParticleBackground } from './blocks/ParticleBackground';
+import { resolveAsset } from '../lib/asset-resolver';
 
 type Vec3 = { x: number; y: number; z: number };
 
@@ -23,24 +25,38 @@ export type SceneJSON = {
 };
 
 function Model({ url, ...props }: { url: string } & React.ComponentProps<'group'>) {
-  const { scene } = useGLTF(url);
+  const resolvedUrl = resolveAsset(url);
+  const { scene } = useGLTF(resolvedUrl);
   return <primitive object={scene} {...props} />;
 }
 
 const RenderedObject = ({ obj }: { obj: SceneObject }) => {
   const ref = useRef<THREE.Group>(null!);
 
-  useFrame((_, delta) => {
-    if (obj.animation?.preset === 'rotate' && ref.current) {
+  // Animation handler
+  useFrame(({ clock }, delta) => {
+    if (!ref.current) return;
+
+    // Handle rotation
+    if (obj.animation?.preset === 'rotate') {
       const speed = obj.animation.params?.speed ?? 0.5;
       const axis = obj.animation.params?.axis ?? 'y';
       (ref.current.rotation as any)[axis] += delta * speed;
+    }
+
+    // Handle float
+    if (obj.animation?.preset === 'float') {
+      const speed = obj.animation.params?.speed ?? 1;
+      const amplitude = obj.animation.params?.amplitude ?? 0.1;
+      ref.current.position.y = (obj.transform?.position?.y ?? 0) + Math.sin(clock.elapsedTime * speed) * amplitude;
     }
   });
 
   const handleClick = () => {
     if (obj.interaction?.onClick) {
       console.log(`Clicked on ${obj.id}, action: ${obj.interaction.onClick.action}`);
+      // Dispatch a global event for the interaction system
+      window.dispatchEvent(new CustomEvent('sceneAction', { detail: obj.interaction.onClick }));
     }
   };
 
@@ -48,6 +64,25 @@ const RenderedObject = ({ obj }: { obj: SceneObject }) => {
   const rot = obj.transform?.rotation ?? { x: 0, y: 0, z: 0 };
   const scale = obj.transform?.scale ?? { x: 1, y: 1, z: 1 };
   const color = obj.material?.color ?? '#ffffff';
+
+  // For non-animating objects, set the initial position
+  if (obj.animation?.preset !== 'float') {
+    ref.current?.position.set(pos.x, pos.y, pos.z);
+  }
+
+  if (obj.type === 'light') {
+    return (
+      <pointLight
+        position={[pos.x, pos.y, pos.z]}
+        color={color}
+        intensity={obj.props?.intensity ?? 1}
+      />
+    );
+  }
+
+  if (obj.type === 'particle') {
+    return <ParticleBackground {...obj.props} />;
+  }
 
   return (
     <group

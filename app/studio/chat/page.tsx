@@ -1,5 +1,5 @@
 "use client";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import ScenePlayer from "@/src/components/ScenePlayer";
 
 type Message = { role: "user" | "assistant"; content: string };
@@ -75,11 +75,22 @@ function PropertiesPanel({ scene, setScene }: { scene: any; setScene: React.Disp
 
 export default function ChatStudioPage(): JSX.Element {
   const [prompt, setPrompt] = useState("");
+  const [refinePrompt, setRefinePrompt] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [scene, setScene] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
   const [exporting, setExporting] = useState(false);
-  const [exportHref, setExportHref] = useState<string | null>(null);
+  
+
+  useEffect(() => {
+    const handleSceneAction = (event: CustomEvent) => {
+      const { action, payload } = (event as any).detail || {};
+      alert(`Interaction Triggered!\nAction: ${action}\nPayload: ${JSON.stringify(payload)}`);
+    };
+
+    window.addEventListener('sceneAction', handleSceneAction as EventListener);
+    return () => window.removeEventListener('sceneAction', handleSceneAction as EventListener);
+  }, []);
 
   const sendPrompt = async () => {
     if (!prompt.trim()) return;
@@ -115,23 +126,79 @@ export default function ChatStudioPage(): JSX.Element {
     if (!scene) return;
     setExporting(true);
     try {
-      const res = await fetch("/api/export", {
+      const res = await fetch("/api/export/zip", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ scene }),
       });
-      const contentType = res.headers.get("content-type") || "";
-      const data = contentType.includes("application/json") ? await res.json() : { raw: await res.text() };
       if (!res.ok) {
-        setMessages((m) => [...m, { role: "assistant", content: `Export error: ${data?.error?.message ?? res.statusText}` }]);
-      } else {
-        setMessages((m) => [...m, { role: "assistant", content: "Exported preview route. Open the link to view." }]);
-        setExportHref("/preview");
+        throw new Error('Failed to generate ZIP file.');
       }
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = "kryptex-export.zip";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+      setMessages((m) => [...m, { role: "assistant", content: "Project ZIP file downloaded." }]);
     } catch (err: any) {
       setMessages((m) => [...m, { role: "assistant", content: `Export error: ${String(err?.message ?? err)}` }]);
     } finally {
       setExporting(false);
+    }
+  };
+
+  const sendRefinePrompt = async () => {
+    if (!refinePrompt.trim() || !scene) return;
+    setLoading(true);
+    try {
+      const res = await fetch("/api/ai/refine-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene, prompt: refinePrompt }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setMessages((m) => [...m, { role: "assistant", content: `Refine Error: ${data?.error?.message ?? res.statusText}` }]);
+      } else {
+        setScene(data);
+        setMessages((m) => [...m, { role: "assistant", content: `Scene refined: ${refinePrompt}` }]);
+      }
+    } catch (err: any) {
+      setMessages((m) => [...m, { role: "assistant", content: `Refine Error: ${String(err?.message ?? err)}` }]);
+    } finally {
+      setLoading(false);
+      setRefinePrompt("");
+    }
+  };
+
+  const refineScene = async () => {
+    if (!scene || !refinePrompt.trim()) return;
+    try {
+      const res = await fetch("/api/ai/refine-scene", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scene, prompt: refinePrompt }),
+      });
+      const contentType = res.headers.get("content-type") || "";
+      const data = contentType.includes("application/json") ? await res.json() : { raw: await res.text() };
+      if (!res.ok) {
+        setMessages((m) => [...m, { role: "assistant", content: `Refine error: ${data?.error ?? res.statusText}` }]);
+      } else {
+        if (contentType.includes("application/json")) {
+          setScene(data);
+          setMessages((m) => [...m, { role: "assistant", content: "Scene refined. Preview updated below." }]);
+        } else {
+          setMessages((m) => [...m, { role: "assistant", content: "Refine error: Unexpected non-JSON response" }]);
+        }
+      }
+    } catch (err: any) {
+      setMessages((m) => [...m, { role: "assistant", content: `Refine error: ${String(err?.message ?? err)}` }]);
+    } finally {
+      setRefinePrompt("");
     }
   };
 
@@ -145,13 +212,8 @@ export default function ChatStudioPage(): JSX.Element {
             onClick={exportScene}
             disabled={!scene || exporting}
           >
-            {exporting ? "Exporting…" : "Export & Create Route"}
+            {exporting ? "Zipping…" : "Export as ZIP"}
           </button>
-          {exportHref && (
-            <a className="px-3 py-2 rounded bg-slate-700" href={exportHref} target="_blank" rel="noopener noreferrer">
-              Open Exported Preview
-            </a>
-          )}
         </div>
       </header>
 
@@ -181,6 +243,22 @@ export default function ChatStudioPage(): JSX.Element {
               </div>
             ))}
             {messages.length === 0 && <div className="text-slate-400">Type a prompt and press Generate.</div>}
+          </div>
+          <div className="rounded border border-white/10 p-3">
+            <textarea
+              value={refinePrompt}
+              onChange={(e) => setRefinePrompt(e.target.value)}
+              placeholder="Refine the scene... (e.g., 'make the first cube red')"
+              className="w-full h-20 bg-black/30 border border-white/10 rounded p-2"
+              disabled={!scene || loading}
+            />
+            <button
+              className="mt-2 w-full px-3 py-2 rounded bg-teal-600 hover:bg-teal-500 disabled:opacity-50"
+              onClick={sendRefinePrompt}
+              disabled={!scene || loading}
+            >
+              {loading ? "Refining…" : "Refine"}
+            </button>
           </div>
         </div>
 
