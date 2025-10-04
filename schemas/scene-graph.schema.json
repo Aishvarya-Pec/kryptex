@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://krptex.dev/schemas/scene-graph.schema.json",
+  "title": "SceneGraph",
+  "type": "object",
+  "required": ["metadata", "camera", "objects"],
+  "properties": {
+    "metadata": {
+      "type": "object",
+      "required": ["version", "author"],
+      "properties": {
+        "version": {"type": "string"},
+        "author": {"type": "string"}
+      }
+    },
+    "camera": {
+      "type": "object",
+      "required": ["type", "position", "fov"],
+      "properties": {
+        "type": {"enum": ["orbit", "follow", "static"]},
+        "position": {
+          "type": "object",
+          "required": ["x", "y", "z"],
+          "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
+        },
+        "fov": {"type": "number"},
+        "controls": {"type": "object"}
+      }
+    },
+    "objects": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/SceneObject"},
+      "minItems": 1
+    }
+  },
+  "definitions": {
+    "Vec3": {
+      "type": "object",
+      "required": ["x", "y", "z"],
+      "properties": {"x": {"type": "number"}, "y": {"type": "number"}, "z": {"type": "number"}}
+    },
+    "SceneObject": {
+      "type": "object",
+      "required": ["id", "type"],
+      "properties": {
+        "id": {"type": "string"},
+        "type": {"enum": ["mesh", "text", "model", "light", "particle", "group"]},
+        "transform": {
+          "type": "object",
+          "properties": {
+            "position": {"$ref": "#/definitions/Vec3"},
+            "rotation": {"$ref": "#/definitions/Vec3"},
+            "scale": {"$ref": "#/definitions/Vec3"}
+          }
+        },
+        "material": {
+          "type": "object",
+          "properties": {
+            "preset": {"type": "string"},
+            "color": {"type": "string"},
+            "roughness": {"type": "number"},
+            "metalness": {"type": "number"}
+          }
+        },
+        "animation": {"type": "object"},
+        "interaction": {"type": "object"},
+        "responsive": {"type": "object"},
+        "children": {"type": "array", "items": {"$ref": "#/definitions/SceneObject"}}
+      }
+    }
+  }
+}

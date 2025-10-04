@@ -1,0 +1,13 @@
+{
+  "metadata": { "version": "1.0.0", "author": "example" },
+  "camera": { "type": "orbit", "position": { "x": 0, "y": 1.4, "z": 6 }, "fov": 50 },
+  "objects": [
+    {
+      "id": "obj_cube_01",
+      "type": "mesh",
+      "transform": { "position": { "x": 0, "y": 0, "z": 0 } },
+      "material": { "preset": "matte", "color": "#ff4db8" },
+      "animation": { "preset": "rotate", "params": { "axis": "y", "speed": 0.5 } }
+    }
+  ]
+}

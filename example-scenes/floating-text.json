@@ -1,0 +1,13 @@
+{
+  "metadata": { "version": "1.0.0", "author": "example" },
+  "camera": { "type": "orbit", "position": { "x": 0, "y": 1.4, "z": 6 }, "fov": 50 },
+  "objects": [
+    {
+      "id": "obj_heroText_01",
+      "type": "text",
+      "transform": { "position": { "x": 0, "y": 1.2, "z": 0 }, "scale": { "x": 1.5, "y": 1.5, "z": 1 } },
+      "material": { "preset": "neonGlow", "color": "#9f5cff" },
+      "animation": { "preset": "float", "params": { "amplitude": 0.12 } }
+    }
+  ]
+}
