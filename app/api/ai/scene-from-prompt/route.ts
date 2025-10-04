@@ -8,6 +8,7 @@ async function remoteGenerate(promptText: string) {
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY not set');
   }
+  const model = process.env.OPENROUTER_MODEL ?? 'deepseek/deepseek-chat-v3.1:free';
   const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -15,7 +16,7 @@ async function remoteGenerate(promptText: string) {
       Authorization: `Bearer ${apiKey}`,
     },
     body: JSON.stringify({
-      model: 'deepseek/deepseek-chat-v3.1:free',
+      model,
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: promptText },
