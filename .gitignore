@@ -4,3 +4,6 @@ out/
 .vercel/
 *.log
 coverage/
+# Environment files (do not commit secrets)
+.env.local
+.env.production
